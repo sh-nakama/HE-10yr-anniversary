@@ -1,0 +1,123 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r setup}
+library(tidyverse)
+library(ggtext)
+library(skimr)
+library(extrafont)
+library(magick)
+```
+
+```{r}
+
+#-----------read data----------------
+# dat, imported from internal file, technically public as the numbers are published in individual pdf reports
+# skim(dat)
+# glimpse(dat)
+
+# ----------------prep data---------------------------
+#  want months in long form
+dat <- dat %>% select(-c(Total)) %>%
+  pivot_longer(cols = c(3:14), names_to = "Month", values_to = "kWh")
+
+#  do commerical savings first
+dat <- dat %>% 
+  filter(Unit == "Incentives  ($)") %>%
+  mutate(
+    number = row_number(),
+    position_min = (Year - 8)*12 - 11,
+    position_max = (Year-8) * 12,
+    py_label = (position_min+position_max)/2
+  )
+
+```
+
+```{r}
+# ---------------- Create Hawaii Energy theme ----------------
+#  hawaii energy colors hexadecimal
+HE_blue <- "#00B3DF"
+dark_blue <- "#004C66"
+yellow <- "#F4F090"
+dark_gray <- "#AEB0B2"
+
+font_family1 <- "Lucida Sans"
+font_family2 <- "Corbel Light"
+background <- dark_blue
+text_colour1 <- HE_blue
+text_colour2 <- "white"
+axis_colour <- "white"
+plot_colour <- dark_blue
+theme_style <- theme(text = element_text(family = font_family2),
+                  rect = element_rect(fill = background),
+                  plot.background = element_rect(fill = background, color = NA),
+                  plot.subtitle = element_text(family = font_family1, size = 14, colour = text_colour1),
+                  plot.caption = element_text(family = font_family1, size = 9, colour = text_colour1),
+                  panel.background = element_rect(fill = background, color = NA),
+                  panel.border = element_blank(),
+                  panel.grid.major.y = element_line(color = plot_colour, linetype = 2, size = .2),
+                  panel.grid.major.x = element_blank(),
+                  panel.grid.minor.x = element_blank(),
+                  plot.margin = unit(c(1, 1, 1, 1), "cm"),
+                  axis.title.x = element_blank(),
+                  axis.text.x = element_blank(),
+                  axis.title.y = element_text(family = font_family1, size = 10, colour= text_colour1),
+                  axis.text.y = element_text(family = font_family1, size = 10, colour= text_colour1),
+                  axis.ticks = element_blank(),
+                  axis.line = element_blank(),
+                  legend.position="none")
+
+theme_set(theme_classic() + theme_style)
+
+# ---------------- create plot ------------------------
+ten_ann <- ggplot(dat) +
+  #  Place PY labels above year average
+  geom_text(data = dat, aes(y = Mean + 250000, x = py_label,
+                            label = glue::glue(" PY{Year} ")) # offset the text from the geom_segment slightly for visibility
+            ,family = font_family2,
+            size = 10,
+            color = HE_blue
+            ) +
+    #  plot the PY average runrate
+  geom_segment(aes(x = position_min, xend = position_max, y = Mean, yend = Mean), colour = "white", size = 2, alpha = 0.7) +
+  #  plot geom_line to connect the years
+  geom_line(aes(x = number, y = Mean), colour = "white", size = 0.5, alpha = 0.7) + 
+  #  plot individual monthly run rates points
+  geom_point(aes(number, kWh), colour = "#fff838", alpha = 0.7, show.legend = F) + 
+  #  plot lines connecting average to monthly
+  geom_segment(aes(x=number, xend = number, y = Mean, yend = kWh), colour = "white", linetype = 2, size = 0.5, alpha = 0.3) + 
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "<span style='font-size:30pt; color:#00B3DF;'> Hawaii Energy Average Incentives per Month for 10 years </span>",
+    subtitle = "How much incentive dollars does Hawaii Energy give out each month?",
+    # ,caption = "Produced by Hawaii Energy",
+    y = "Incentives in Dollars") +
+  theme(plot.title = element_markdown(size = 18, family = font_family1))
+
+#-----------save plot
+ggsave("Hawaii-Energy-10 year-Incentive-Runrate.png", width = 15, height = 9)
+
+#------ add HE logo https://themockup.blog/posts/2019-01-09-add-a-logo-to-your-plot/
+#  read the image we just made
+he_ten <- image_read("Hawaii-Energy-10 year-Incentive-Runrate.png")
+#  read the logo
+logo <- image_read("HEP-10-Years-Logo.png") %>% image_resize("350x350")
+#  find image details so we know how many pixels to offset the logo
+plot_height <- magick::image_info(he_ten)$height
+plot_width <- magick::image_info(he_ten)$width
+#  also need to know how to scale logo
+logo_width <- magick::image_info(logo)$width
+logo_height <- magick::image_info(logo)$height
+#  want to put in top right
+verti_loc <- plot_height * 0.03
+horiz_loc <- (plot_width - verti_loc) - 350
+
+new_he_ten <- he_ten %>% image_composite(logo, offset = paste0("+",horiz_loc,"+",verti_loc))
+image_write(new_he_ten, "Hawaii-Energy-10 year-Incentive-Runrate-w-logo.png")
+```
+
+
+
