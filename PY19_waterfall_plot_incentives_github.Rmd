@@ -15,7 +15,7 @@ library(magick)
 ```{r}
 
 #-----------read data----------------
-# dat, imported from internal file, technically public as the numbers are published in individual pdf reports
+# dat, imported from internal file, technically public though the numbers published are aggregated and in individual pdf reports
 # skim(dat)
 # glimpse(dat)
 
